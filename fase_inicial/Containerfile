@@ -1,0 +1,24 @@
+# /opt/rtmp/Containerfile
+
+# Imagen base con nginx + módulo rtmp ya listo (Alpine)
+FROM docker.io/alfg/nginx-rtmp:latest
+
+# 2. Nos cambiamos a usuario root para poder instalar cosas
+USER root
+
+# 3. Instalamos FFmpeg usando el gestor de paquetes de Alpine: 'apk'
+#    'no-cache' hace que la imagen final sea más pequeña.
+RUN apk update && apk add --no-cache ffmpeg && rm -rf /var/cache/apk/*
+
+# Crea usuario/grupo 'nginx' y ajusta permisos
+#RUN addgroup -S nginx \
+# && adduser -S -G nginx nginx \
+# && mkdir -p /var/cache/nginx /var/run /var/log/nginx \
+# && chown -R nginx:nginx /var/cache/nginx /var/run /var/log/nginx /etc/nginx
+
+# (Opcional) copia tu nginx.conf con los exec_push ya puestos
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY nginx.conf /etc/nginx/nginx.conf.template
+
+# Buenas prácticas: vuelve al usuario sin privilegios
+#USER nginx

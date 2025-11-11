@@ -1,0 +1,14 @@
+services:
+  rtmp:
+    image: alfg/nginx-rtmp:latest
+    # (Si decides build propio lo cambiamos por `build: ./rtmp`)
+    container_name: rtmp
+    restart: unless-stopped
+    ports:
+      - "${RTMP_PORT}:1935/tcp"
+    environment:
+      - STREAM_APP=${STREAM_APP}
+      - STREAM_NAME=${STREAM_NAME}
+    volumes:
+      - ./rtmp/nginx.conf:/etc/nginx/nginx.conf:ro
+    # Rootless-friendly configs los añadimos en el hardening step
