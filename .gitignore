@@ -1,2 +1,11 @@
+# Local secrets — never commit
 .env
+.env.*
+!.env.example
+
 *.log
+
+# Rendered from rtmp/nginx.conf.template. Contains live platform stream keys.
+# Production /opt/rtmp/nginx.conf is generated the same way and stays off git.
+rtmp/nginx.conf
+nginx.conf
