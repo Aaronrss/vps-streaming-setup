@@ -42,7 +42,7 @@ On the VPS you can write the live path directly:
 NGINX_CONF_OUT=/opt/rtmp/nginx.conf ./rtmp/render-nginx-conf.sh
 ```
 
-`alfg/nginx-rtmp` re-runs `envsubst` at container start from `nginx.conf.template`. After a local render the keys are already baked in. Do **not** export an environment variable named `name`, or the image will wipe nginx-rtmp's `$name`.
+The image does **not** run `alfg/nginx-rtmp`'s startup `envsubst`. That command would rewrite `/etc/nginx/nginx.conf` and crash if the file is a read-only bind-mount. `rtmp/render-nginx-conf.sh` is the only substitution step; the Containerfile and compose `command` start `nginx` only.
 
 ## OBS (Windows 11) → VPS
 
@@ -65,11 +65,13 @@ Recommended OBS output to match the restream: **60 fps**, enough bitrate for You
 4. Publish from OBS to `rtmp://<VPS_IP>:1935/live/<STREAM_NAME>`
 5. Check `http://<VPS_IP>:8080/stat`
 
-Rebuild the image after you change the rendered `nginx.conf` only if you are not bind-mounting it. This compose file mounts the rendered file, so a container restart is enough.
+Compose bind-mounts the host-rendered `rtmp/nginx.conf` on `/etc/nginx/nginx.conf` as **read-only** and sets `command: ["nginx"]` so the image never tries to `envsubst` over that mount. After you change keys, re-run `./rtmp/render-nginx-conf.sh` and restart the container — no image rebuild. Rebuild only when `rtmp/Containerfile` changes.
+
+The first `--build` still needs a rendered `rtmp/nginx.conf` because the Containerfile `COPY`s it into the image (same bake-in as `/opt/rtmp/` on the VPS). The mount then overrides that copy at runtime.
 
 ## Known-good VPS run (Podman)
 
-This is the production-shaped command from `/opt/rtmp/` (host network, FFmpeg + nginx-rtmp image):
+This is the production-shaped command from `/opt/rtmp/` (host network, FFmpeg + nginx-rtmp image). No bind-mount: the rendered conf is `COPY`'d into the image, and `CMD ["nginx"]` starts nginx without the upstream `envsubst` rewrite.
 
 ```bash
 cd rtmp

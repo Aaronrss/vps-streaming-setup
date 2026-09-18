@@ -6,17 +6,17 @@ services:
     image: nginx-rtmp-ffmpeg
     container_name: rtmp
     restart: unless-stopped
+    # Host already rendered nginx.conf (keys substituted, $name preserved).
+    # alfg/nginx-rtmp default CMD is:
+    #   envsubst … < nginx.conf.template > /etc/nginx/nginx.conf && nginx
+    # That redirect fails on a read-only bind-mount of nginx.conf. Start nginx only.
+    command: ["nginx"]
     ports:
       - "${RTMP_PORT:-1935}:1935/tcp"
       - "${STAT_PORT:-8080}:8080/tcp"
-    environment:
-      - YOUTUBE_STREAM_KEY=${YOUTUBE_STREAM_KEY}
-      - TWITCH_STREAM_KEY=${TWITCH_STREAM_KEY}
-      - KICK_STREAM_KEY=${KICK_STREAM_KEY}
     volumes:
       # Rendered locally; do not commit. :Z is for SELinux (AlmaLinux).
       - ./rtmp/nginx.conf:/etc/nginx/nginx.conf:ro,Z
-      - ./rtmp/nginx.conf:/etc/nginx/nginx.conf.template:ro,Z
     # Known-good VPS run uses host networking and these limits instead of published ports:
     # network_mode: host
     # cpus: 8
