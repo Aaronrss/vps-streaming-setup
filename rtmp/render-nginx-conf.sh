@@ -9,6 +9,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 TEMPLATE="${SCRIPT_DIR}/nginx.conf.template"
 OUTPUT="${NGINX_CONF_OUT:-${SCRIPT_DIR}/nginx.conf}"
 ENV_FILE="${ENV_FILE:-${REPO_ROOT}/.env}"
+REQUIRED_KEYS=(YOUTUBE_STREAM_KEY TWITCH_STREAM_KEY KICK_STREAM_KEY)
 
 if [[ ! -f "${TEMPLATE}" ]]; then
   echo "error: template not found: ${TEMPLATE}" >&2
@@ -16,7 +17,7 @@ if [[ ! -f "${TEMPLATE}" ]]; then
 fi
 
 if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "error: ${ENV_FILE} not found. Copy .env.example to .env and set the stream keys." >&2
+  echo "error: ${ENV_FILE} not found. Run: install -m 600 .env.example .env" >&2
   exit 1
 fi
 
@@ -44,17 +45,34 @@ load_env() {
   done < "${ENV_FILE}"
 }
 
+# Ignore keys already exported in the caller shell; only .env counts.
+unset "${REQUIRED_KEYS[@]}"
 load_env
 
-: "${YOUTUBE_STREAM_KEY:?YOUTUBE_STREAM_KEY is empty or missing in ${ENV_FILE}}"
-: "${TWITCH_STREAM_KEY:?TWITCH_STREAM_KEY is empty or missing in ${ENV_FILE}}"
-: "${KICK_STREAM_KEY:?KICK_STREAM_KEY is empty or missing in ${ENV_FILE}}"
+for key in "${REQUIRED_KEYS[@]}"; do
+  if [[ -z "${!key:-}" ]]; then
+    echo "error: ${key} is empty or missing in ${ENV_FILE}" >&2
+    exit 1
+  fi
+done
+
+tmp=""
+cleanup() {
+  if [[ -n "${tmp}" && -e "${tmp}" ]]; then
+    rm -f "${tmp}"
+  fi
+}
+trap cleanup EXIT
+
+umask 077
+mkdir -p "$(dirname "${OUTPUT}")"
+tmp="$(mktemp "${OUTPUT}.XXXXXX")"
 
 if command -v envsubst >/dev/null 2>&1; then
   envsubst '${YOUTUBE_STREAM_KEY} ${TWITCH_STREAM_KEY} ${KICK_STREAM_KEY}' \
-    < "${TEMPLATE}" > "${OUTPUT}"
+    < "${TEMPLATE}" > "${tmp}"
 else
-  python3 - "${TEMPLATE}" "${OUTPUT}" <<'PY'
+  python3 - "${TEMPLATE}" "${tmp}" <<'PY'
 import os
 import pathlib
 import sys
@@ -67,10 +85,15 @@ pathlib.Path(output_path).write_text(text)
 PY
 fi
 
-if grep -qE '\$\{(YOUTUBE_STREAM_KEY|TWITCH_STREAM_KEY|KICK_STREAM_KEY)\}' "${OUTPUT}"; then
-  echo "error: placeholders remain in ${OUTPUT}; substitution failed." >&2
+if grep -qE '\$\{(YOUTUBE_STREAM_KEY|TWITCH_STREAM_KEY|KICK_STREAM_KEY)\}' "${tmp}"; then
+  echo "error: placeholders remain in rendered output; substitution failed." >&2
   exit 1
 fi
 
-echo "Wrote ${OUTPUT} (gitignored). Do not commit this file or copy it into git."
+chmod 600 "${tmp}"
+mv -f "${tmp}" "${OUTPUT}"
+tmp=""
+chmod 600 "${OUTPUT}"
+
+echo "Wrote ${OUTPUT} (mode 0600, gitignored). Do not commit this file or copy it into git."
 echo "On the VPS, keep the live copy at /opt/rtmp/nginx.conf out of version control."

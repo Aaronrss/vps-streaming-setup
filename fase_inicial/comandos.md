@@ -11,7 +11,7 @@ Canonical steps live in the root [README](../README.md). This file keeps the ori
 ## Generar nginx.conf (sin keys en git)
 
 ```bash
-cp .env.example .env
+install -m 600 .env.example .env
 # llenar YOUTUBE_STREAM_KEY, TWITCH_STREAM_KEY, KICK_STREAM_KEY
 ./rtmp/render-nginx-conf.sh
 # opcional en el VPS:

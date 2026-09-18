@@ -30,7 +30,7 @@ Platform stream keys exist **only** on the VPS (or in your local `.env`). They m
 Render the live config from the template (restricted substitution so nginx-rtmp's `$name` is not eaten):
 
 ```bash
-cp .env.example .env
+install -m 600 .env.example .env
 # edit .env — set YOUTUBE_STREAM_KEY, TWITCH_STREAM_KEY, KICK_STREAM_KEY
 chmod +x rtmp/render-nginx-conf.sh
 ./rtmp/render-nginx-conf.sh
@@ -59,10 +59,10 @@ Recommended OBS output to match the restream: **60 fps**, enough bitrate for You
 
 ## Quick start (compose)
 
-1. Copy `.env.example` → `.env` and fill the three stream keys.
-2. `./rtmp/render-nginx-conf.sh` (creates gitignored `rtmp/nginx.conf`).
+1. `install -m 600 .env.example .env` and fill the three stream keys.
+2. `./rtmp/render-nginx-conf.sh` (creates gitignored `rtmp/nginx.conf` at mode 0600).
 3. `podman-compose up -d --build`
-4. Publish from OBS to `rtmp://<VPS_IP>:1935/live/<STREAM_NAME>`
+4. Publish from OBS to `rtmp://<VPS_IP>:1935/live/<publish_name>`
 5. Check `http://<VPS_IP>:8080/stat`
 
 Compose bind-mounts the host-rendered `rtmp/nginx.conf` on `/etc/nginx/nginx.conf` as **read-only** and sets `command: ["nginx"]` so the image never tries to `envsubst` over that mount. After you change keys, re-run `./rtmp/render-nginx-conf.sh` and restart the container — no image rebuild. Rebuild only when `rtmp/Containerfile` changes.

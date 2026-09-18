@@ -18,8 +18,9 @@ RUN apk update && \
 
 # Generated locally from nginx.conf.template (see render-nginx-conf.sh).
 # Never commit nginx.conf — it contains live stream keys.
+# CMD is nginx only (no upstream envsubst), so do not COPY this secret
+# file to nginx.conf.template.
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY nginx.conf /etc/nginx/nginx.conf.template
 
 # Host render is already final. Skip upstream envsubst (it overwrites
 # nginx.conf and fails if that path is a read-only bind-mount).
