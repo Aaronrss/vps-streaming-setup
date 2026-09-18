@@ -1,0 +1,67 @@
+# Template for the working VPS multistream nginx-rtmp config.
+# Substitute only YOUTUBE_STREAM_KEY, TWITCH_STREAM_KEY, and KICK_STREAM_KEY.
+# Render with ./rtmp/render-nginx-conf.sh (writes gitignored nginx.conf).
+# Do not commit a rendered copy. Production /opt/rtmp/nginx.conf stays local.
+#
+# $name is an nginx-rtmp runtime variable (OBS stream key). Leave it as $name.
+# Do not export an environment variable named `name`.
+
+user root;
+daemon off;
+error_log /dev/stdout info;
+
+events {
+  worker_connections 1024;
+  multi_accept on;
+}
+
+rtmp {
+  server {
+    listen 1935;
+    chunk_size 4096;
+
+    application live {
+      live on;
+      record off;
+      interleave on;
+      wait_video on;
+      wait_key on;
+
+      # YouTube — restream the OBS ingest (no ffmpeg transcode)
+      push rtmp://a.rtmp.youtube.com/live2/${YOUTUBE_STREAM_KEY};
+
+      # Twitch — 60 fps / GOP 120, 6000k (known-good VPS settings)
+      exec_push ffmpeg -v info -nostdin -fflags +genpts -i rtmp://localhost/live/$name -c:v libx264 -preset veryfast -tune zerolatency -profile:v high -pix_fmt yuv420p -r 60 -g 120 -keyint_min 120 -sc_threshold 0 -b:v 6000k -maxrate 6000k -bufsize 12M -c:a aac -b:a 160k -ar 48000 -ac 2 -f flv rtmp://ingest.global-contribute.live-video.net/app/${TWITCH_STREAM_KEY};
+
+      # Kick — 60 fps / GOP 120, 7000k (known-good VPS settings)
+      exec_push ffmpeg -v info -nostdin -fflags +genpts -i rtmp://localhost/live/$name -c:v libx264 -preset veryfast -tune zerolatency -profile:v high -pix_fmt yuv420p -r 60 -g 120 -keyint_min 120 -sc_threshold 0 -b:v 7000k -maxrate 7000k -bufsize 14M -c:a aac -b:a 160k -ar 48000 -ac 2 -f flv rtmps://fa723fc1b171.global-contribute.live-video.net/app/${KICK_STREAM_KEY};
+
+      # TikTok — not configured (leave commented; do not invent keys)
+      # exec_push ffmpeg -v info -nostdin -fflags +genpts -i rtmp://localhost/live/$name -c:v libx264 -preset veryfast -tune zerolatency -profile:v high -pix_fmt yuv420p -r 48 -g 96 -keyint_min 96 -sc_threshold 0 -s 1728x972 -b:v 3500k -maxrate 3500k -bufsize 7M -c:a aac -b:a 128k -ar 48000 -ac 2 -f flv rtmp://<TIKTOK_RTMP_SERVER>/rtmp/<YOUR_TIKTOK_STREAM_KEY>;
+
+      push_reconnect 1s;
+    }
+  }
+}
+
+http {
+  root /www/static;
+  sendfile off;
+  tcp_nopush on;
+  server_tokens off;
+  access_log /dev/stdout combined;
+
+  server {
+    listen 8080;
+
+    # Status dashboard (no auth in the known-good VPS config)
+    location /stat {
+      rtmp_stat all;
+      rtmp_stat_stylesheet stat.xsl;
+    }
+
+    location /stat.xsl {
+      root /www/static;
+    }
+  }
+}
